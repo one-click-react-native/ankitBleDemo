@@ -17,7 +17,6 @@ const App = (props) =>{
 const scanAndConnectDevices=async()=>{
   setDetailState({
     ...detailState,
-    text1:"Scanning..."
   })
   manager.startDeviceScan(null,null,async(error,device)=>{
     console.log("start scan :",device,error)
@@ -41,7 +40,6 @@ const scanAndConnectDevices=async()=>{
         setDetailState({
           ...detailState,
           deviceId:device.id,
-          text1:"Connect to "+device.name
         })
         manager.stopDeviceScan();
       
@@ -175,10 +173,26 @@ useEffect(()=>{
           console.log(error);
         });
     }else{
-      console.log("Please confirm that your device is connected.")
       scanAndConnectDevices()
+      let checkStatus=await checkConnected(detailState.deviceId);
+    if(checkStatus){
+      manager.readCharacteristicForDevice(detailState.deviceId,detailState.serviceUUID,
+        detailState.characteristicsUUID).then(async (characteristics)=>{
+          console.log(characteristics);
+          alert("Success");
+          const readableData=base64.decode(characteristics.value);
+          console.log("Readable data ... ",readableData)
+          setDetailState({
+            ...detailState,
+            text1:"Readable Data :  "+readableData
+          })
+
+        }).catch((error)=>{
+          console.log(error);
+        });
     }
   }
+}
 
   const disconnect=async()=>{
     const checkStatus=await checkConnected(detailState.deviceId);
@@ -203,9 +217,30 @@ useEffect(()=>{
   
     }else{
       scanAndConnectDevices();
+      const checkStatus=await checkConnected(detailState.deviceId);
+    if(checkStatus){
+      console.log(await manager.isDeviceConnected(detailState.deviceId))
+    manager.cancelDeviceConnection(detailState.deviceId).then(()=>{
+        setDetailState({
+
+          deviceId:'',
+    serviceUUID:'',
+    characteristicsUUID:'',
+    text1:'',
+    makeData:[],
+    showToast:false,
+    notificationReceiving:false,
+    dateTime:'',
+    device:{}
+        })
+      }).catch((err)=>{
+        console.log('Error in disconnected',err);
+      })
+  
     }
     
   }
+}
 
   const [inputMessage,setInputMessage]=useState('');
   const messageInputHandler=(text)=>{
@@ -233,8 +268,26 @@ useEffect(()=>{
   }else{
     alert("Device reconnection start :");
     scanAndConnectDevices()
+    console.log("Check status    :",await checkConnected(detailState.deviceId))
+    if(await checkConnected(detailState.deviceId)){
+      const sendData=base64.encode(message);
+      console.log("Device in msg ,",detailState.serviceUUID,sendData)
+      if(detailState.deviceId!==''){
+        manager.writeCharacteristicWithResponseForDevice(detailState.deviceId,
+          detailState.serviceUUID,detailState.characteristicsUUID,sendData).then((characteristics)=>{
+          console.log(characteristics);
+          alert("success");
+          return
+        }).catch(error=>{
+        console.log(error)
+      })
+    }else{
+      console.log("device not connected");
+    }
+
   }
 }
+  }
 
 
   return(
